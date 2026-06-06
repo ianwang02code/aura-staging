@@ -76,7 +76,7 @@
   #completed.active { display: block; }
   .after-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
   .before-clip { position: absolute; top: 0; left: 0; bottom: 0; overflow: hidden; border-right: 1.5px solid rgba(255,255,255,0.4); }
-  .before-clip img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; min-width: 100%; }
+  .before-clip img { position: absolute; top: 0; left: 0; height: 100%; object-fit: cover; object-position: left center; }
   .before-tag { position: absolute; top: 12px; left: 12px; background: rgba(9,9,11,0.75); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 4px 10px; font-size: 10px; color: var(--text2); letter-spacing: 0.08em; text-transform: uppercase; font-family: 'DM Mono', monospace; }
   .after-tag { position: absolute; top: 12px; right: 12px; background: var(--indigo); border-radius: 6px; padding: 4px 10px; font-size: 10px; color: white; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; font-family: 'DM Mono', monospace; }
   .watermark { position: absolute; bottom: 12px; left: 12px; background: rgba(9,9,11,0.82); border: 1px solid rgba(255,255,255,0.07); border-radius: 8px; padding: 8px 13px; display: flex; align-items: center; gap: 9px; pointer-events: none; }
@@ -392,6 +392,8 @@
     document.getElementById('after-img').src = aiImageUrl;
     currentStep = 'completed';
     showState('completed');
+    const vw = document.getElementById('viewport').offsetWidth;
+    document.getElementById('before-img').style.width = vw + 'px';
     document.getElementById('reset-btn').classList.add('visible');
     setStatus('AI staging complete ✓');
     document.getElementById('action-area').innerHTML =
@@ -410,7 +412,10 @@
   }
 
   function updateSlider(val) {
+    const viewport = document.getElementById('viewport');
+    const vw = viewport.offsetWidth;
     document.getElementById('before-clip').style.width = val + '%';
+    document.getElementById('before-img').style.width = vw + 'px';
     document.getElementById('slider-line').style.left = val + '%';
   }
 
