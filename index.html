@@ -362,10 +362,10 @@
 
       const data = await res.json();
 
-      if (data.imageUrl) {
+      if (data.imageBase64) {
         clearInterval(logInterval);
         document.getElementById('progress-fill').style.width = '100%';
-        setTimeout(() => showCompleted(data.imageUrl), 500);
+        setTimeout(() => showCompleted(data.imageBase64), 500);
       } else {
         throw new Error(data.error || 'Generation failed');
       }
