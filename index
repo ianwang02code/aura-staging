@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AuraStaging — AI Virtual Staging</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #09090b;
+    --bg2: #111113;
+    --bg3: #18181b;
+    --border: rgba(255,255,255,0.08);
+    --border2: rgba(255,255,255,0.14);
+    --text: #fafafa;
+    --text2: #a1a1aa;
+    --text3: #71717a;
+    --indigo: #6366f1;
+    --indigo-hover: #4f46e5;
+    --indigo-dim: rgba(99,102,241,0.12);
+    --indigo-border: rgba(99,102,241,0.3);
+    --green: #10b981;
+    --green-dim: rgba(16,185,129,0.08);
+    --green-border: rgba(16,185,129,0.2);
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* NAV */
+  nav {
+    border-bottom: 1px solid var(--border);
+    background: rgba(9,9,11,0.85);
+    backdrop-filter: blur(12px);
+    padding: 14px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+  }
+
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-icon {
+    width: 32px; height: 32px;
+    background: var(--indigo);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 600; color: white; font-size: 15px;
+    letter-spacing: -0.5px;
+  }
+  .logo-name { font-size: 16px; font-weight: 500; letter-spacing: -0.3px; }
+  .logo-badge {
+    font-size: 10px; color: #818cf8;
+    background: var(--indigo-dim);
+    border: 1px solid var(--indigo-border);
+    border-radius: 4px; padding: 2px 7px;
+    font-family: 'DM Mono', monospace;
+  }
+  .legal-badge {
+    font-size: 11px; color: var(--green);
+    background: var(--green-dim);
+    border: 1px solid var(--green-border);
+    border-radius: 20px; padding: 5px 12px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .legal-badge::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 50%; background: var(--green);
+  }
+
+  /* MAIN LAYOUT */
+  main {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 32px 24px;
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 24px;
+  }
+
+  /* VIEWPORT */
+  .viewport {
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+    aspect-ratio: 16/10;
+    background: var(--bg2);
+    position: relative;
+  }
+
+  .state { position: absolute; inset: 0; display: none; }
+  .state.active { display: flex; }
+
+  /* IDLE STATE */
+  #idle {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 32px;
+  }
+  .upload-zone {
+    border: 1.5px dashed var(--border2);
+    border-radius: 12px;
+    padding: 40px 48px;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    display: flex; flex-direction: column; align-items: center; gap: 12px;
+  }
+  .upload-zone:hover { border-color: var(--indigo); background: var(--indigo-dim); }
+  .upload-icon {
+    width: 48px; height: 48px;
+    border-radius: 12px;
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+  }
+  .upload-zone h3 { font-size: 15px; font-weight: 500; color: var(--text); }
+  .upload-zone p { font-size: 12px; color: var(--text3); line-height: 1.6; max-width: 240px; }
+  .upload-zone .hint { font-size: 11px; color: var(--indigo); font-family: 'DM Mono', monospace; }
+  #file-input { display: none; }
+
+  /* SCANNING STATE */
+  #scanning { align-items: center; justify-content: center; }
+  #scanning img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: brightness(0.4); }
+  .scan-overlay { position: relative; z-index: 2; }
+  .scan-pill {
+    background: rgba(99,102,241,0.12);
+    border: 1px solid rgba(99,102,241,0.35);
+    border-radius: 10px; padding: 14px 22px; text-align: center;
+  }
+  .scan-pill .scan-label {
+    font-size: 10px; font-family: 'DM Mono', monospace;
+    color: #a5b4fc; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 6px;
+  }
+  .scan-pill .scan-status { font-size: 13px; color: white; font-weight: 500; }
+
+  /* PROCESSING STATE */
+  #processing { align-items: center; justify-content: center; }
+  #processing img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: brightness(0.3) blur(6px); }
+  .log-overlay { position: relative; z-index: 2; }
+  .log-box {
+    background: rgba(9,9,11,0.9);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px; padding: 18px; width: 360px;
+  }
+  .log-header {
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;
+    font-size: 10px; font-family: 'DM Mono', monospace; color: var(--text3);
+  }
+  .spin { animation: spin 1s linear infinite; display: inline-block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .log-entries { height: 88px; overflow: hidden; display: flex; flex-direction: column; gap: 6px; }
+  .log-line {
+    font-size: 10px; font-family: 'DM Mono', monospace;
+    display: flex; gap: 8px; color: var(--text3);
+  }
+  .log-line.active { color: #a5b4fc; }
+  .progress-track {
+    background: rgba(255,255,255,0.06);
+    height: 2px; border-radius: 99px; margin-top: 14px; overflow: hidden;
+  }
+  .progress-fill { height: 100%; background: var(--indigo); border-radius: 99px; transition: width 0.7s ease; }
+
+  /* COMPLETED STATE */
+  #completed { display: none; }
+  #completed.active { display: block; }
+  .after-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .before-clip {
+    position: absolute; top: 0; left: 0; bottom: 0; overflow: hidden;
+    border-right: 1.5px solid rgba(255,255,255,0.4);
+  }
+  .before-clip img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; min-width: 100%; }
+  .before-tag {
+    position: absolute; top: 12px; left: 12px;
+    background: rgba(9,9,11,0.75); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px; padding: 4px 10px;
+    font-size: 10px; color: var(--text2); letter-spacing: 0.08em; text-transform: uppercase;
+    font-family: 'DM Mono', monospace;
+  }
+  .after-tag {
+    position: absolute; top: 12px; right: 12px;
+    background: var(--indigo); border-radius: 6px; padding: 4px 10px;
+    font-size: 10px; color: white; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase;
+    font-family: 'DM Mono', monospace;
+  }
+  .watermark {
+    position: absolute; bottom: 12px; left: 12px;
+    background: rgba(9,9,11,0.82); border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 8px; padding: 8px 13px;
+    display: flex; align-items: center; gap: 9px; pointer-events: none;
+  }
+  .wm-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+  .wm-title { font-size: 10px; color: #e4e4e7; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; }
+  .wm-sub { font-size: 9px; color: var(--text3); font-family: 'DM Mono', monospace; margin-top: 2px; }
+  .slider-line {
+    position: absolute; top: 0; bottom: 0; width: 1.5px;
+    background: white; pointer-events: none; z-index: 10;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .slider-knob {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: white; display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.4); font-size: 13px; color: #27272a;
+  }
+  .slider-range {
+    position: absolute; inset: 0; opacity: 0; cursor: ew-resize; z-index: 20;
+    width: 100%; height: 100%;
+  }
+
+  /* STATUS BAR */
+  .status-bar {
+    margin-top: 10px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px; padding: 9px 16px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .status-bar span { font-size: 11px; font-family: 'DM Mono', monospace; color: var(--text3); }
+  .reset-link {
+    font-size: 11px; color: #818cf8; cursor: pointer;
+    font-family: 'DM Mono', monospace; background: none; border: none;
+    display: none; align-items: center; gap: 4px;
+  }
+  .reset-link.visible { display: flex; }
+
+  /* PANEL */
+  .panel {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 16px; padding: 22px;
+    display: flex; flex-direction: column; gap: 22px;
+  }
+  .panel-title { font-size: 15px; font-weight: 500; letter-spacing: -0.2px; }
+  .panel-sub { font-size: 12px; color: var(--text3); margin-top: 4px; line-height: 1.6; }
+
+  .section-label {
+    font-size: 10px; font-family: 'DM Mono', monospace;
+    color: var(--text3); text-transform: uppercase; letter-spacing: 0.1em;
+    display: block; margin-bottom: 10px;
+  }
+
+  .style-card {
+    padding: 13px 15px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    cursor: pointer; margin-bottom: 8px;
+    transition: border-color 0.15s, background 0.15s;
+    background: var(--bg3);
+  }
+  .style-card:last-child { margin-bottom: 0; }
+  .style-card:hover { border-color: var(--border2); }
+  .style-card.active { border-color: var(--indigo); border-width: 1.5px; background: var(--indigo-dim); }
+  .style-card-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; }
+  .style-card-name { font-size: 13px; font-weight: 500; color: var(--text); }
+  .style-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--indigo); display: none; }
+  .style-card.active .style-dot { display: block; }
+  .style-card-desc { font-size: 11px; color: var(--text3); line-height: 1.5; }
+
+  .divider { border: none; border-top: 1px solid var(--border); }
+
+  .check-list { display: flex; flex-direction: column; gap: 12px; }
+  .check-item { display: flex; gap: 9px; font-size: 11px; color: var(--text2); line-height: 1.6; }
+  .check-icon { color: var(--green); flex-shrink: 0; margin-top: 1px; font-size: 14px; }
+  .check-item strong { color: var(--text); font-weight: 500; }
+
+  .btn-primary {
+    width: 100%; padding: 13px;
+    background: var(--indigo); color: white;
+    border: none; border-radius: 10px;
+    font-size: 13px; font-weight: 500;
+    cursor: pointer; font-family: 'DM Sans', sans-serif;
+    display: flex; align-items: center; justify-content: center; gap: 7px;
+    transition: background 0.15s;
+  }
+  .btn-primary:hover { background: var(--indigo-hover); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .btn-sec {
+    padding: 11px 10px; background: var(--bg3);
+    border: 1px solid var(--border2); border-radius: 10px;
+    font-size: 11px; font-weight: 500; color: var(--text);
+    cursor: pointer; font-family: 'DM Sans', sans-serif;
+    display: flex; align-items: center; justify-content: center; gap: 5px;
+    transition: background 0.15s;
+  }
+  .btn-sec:hover { background: rgba(255,255,255,0.05); }
+  .btn-accent {
+    padding: 11px 10px; background: var(--indigo);
+    border: none; border-radius: 10px;
+    font-size: 11px; font-weight: 500; color: white;
+    cursor: pointer; font-family: 'DM Sans', sans-serif;
+    display: flex; align-items: center; justify-content: center; gap: 5px;
+    transition: background 0.15s;
+  }
+  .btn-accent:hover { background: var(--indigo-hover); }
+
+  .pitch-note {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px;
+    font-size: 10px; font-family: 'DM Mono', monospace;
+    color: var(--text3); line-height: 1.7; text-align: center;
+  }
+  .pitch-note span { color: var(--text2); }
+
+  @media (max-width: 768px) {
+    main { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">
+    <div class="logo-icon">A</div>
+    <span class="logo-name">AuraStaging</span>
+    <span class="logo-badge">v1.0 Demo</span>
+  </div>
+  <div class="legal-badge">CA AB 723 Legal Safeguard Active</div>
+</nav>
+
+<main>
+  <div>
+    <!-- VIEWPORT -->
+    <div class="viewport" id="viewport">
+
+      <!-- IDLE -->
+      <div class="state active" id="idle">
+        <div class="upload-zone" onclick="document.getElementById('file-input').click()">
+          <div class="upload-icon">📷</div>
+          <h3>Upload raw empty room photo</h3>
+          <p>Drop your high-res camera shot here. Our AI will auto-detect lens focal length and enforce spatial scales.</p>
+          <span class="hint">Click to select file or drag & drop</span>
+        </div>
+        <input type="file" id="file-input" accept="image/*" onchange="handleFileUpload(this)" />
+      </div>
+
+      <!-- SCANNING -->
+      <div class="state" id="scanning">
+        <img id="scan-img" src="" alt="Scanning room" />
+        <div class="scan-overlay">
+          <div class="scan-pill">
+            <div class="scan-label">Initializing spatial mesh</div>
+            <div class="scan-status">Locking rigid architecture bounds...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PROCESSING -->
+      <div class="state" id="processing">
+        <img id="proc-img" src="" alt="Processing room" />
+        <div class="log-overlay">
+          <div class="log-box">
+            <div class="log-header">
+              <span>ENGINE_LOG_STAGING_v1.0</span>
+              <span class="spin">↻</span>
+            </div>
+            <div class="log-entries" id="log-entries"></div>
+            <div class="progress-track">
+              <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- COMPLETED -->
+      <div class="state" id="completed">
+        <img class="after-img" id="after-img" src="https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80" alt="AI staged room" />
+        <div class="before-clip" id="before-clip" style="width:50%">
+          <img id="before-img" src="" alt="Empty room before staging" />
+          <span class="before-tag">Before (raw)</span>
+        </div>
+        <span class="after-tag">After (AI staged)</span>
+        <div class="watermark">
+          <div class="wm-dot"></div>
+          <div>
+            <div class="wm-title">Virtually staged</div>
+            <div class="wm-sub">CA AB 723 Compliant · 1:1 Scale Verified</div>
+          </div>
+        </div>
+        <div class="slider-line" id="slider-line" style="left:50%">
+          <div class="slider-knob">⇔</div>
+        </div>
+        <input type="range" min="0" max="100" value="50" class="slider-range" id="slider" oninput="updateSlider(this.value)" />
+      </div>
+
+    </div>
+
+    <!-- STATUS BAR -->
+    <div class="status-bar">
+      <span id="status-text">Input resolution: 4096 × 2560 (Sony Alpha RAW)</span>
+      <button class="reset-link" id="reset-btn" onclick="resetDemo()">↺ Reset demo</button>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div style="display:flex; flex-direction:column; gap:16px;">
+    <div class="panel">
+      <div>
+        <div class="panel-title">Aura engine pitch panel</div>
+        <div class="panel-sub">Showcase how AuraStaging converts raw architecture into high-premium emotion.</div>
+      </div>
+
+      <div>
+        <span class="section-label">1. Select luxury vibe direction</span>
+        <div class="style-card active" onclick="selectStyle(this, 'Japandi minimal, serene, wabi-sabi')">
+          <div class="style-card-row">
+            <span class="style-card-name">Japandi minimal</span>
+            <div class="style-dot"></div>
+          </div>
+          <div class="style-card-desc">Serene timbers & wabi-sabi organic shapes</div>
+        </div>
+        <div class="style-card" onclick="selectStyle(this, 'Modern luxury, cinematic, premium marble')">
+          <div class="style-card-row">
+            <span class="style-card-name">Modern luxury</span>
+            <div class="style-dot"></div>
+          </div>
+          <div class="style-card-desc">Cinematic deep shadows & premium marbles</div>
+        </div>
+        <div class="style-card" onclick="selectStyle(this, 'Airbnb cozy, golden hour, warm Gen-Z aesthetic')">
+          <div class="style-card-row">
+            <span class="style-card-name">Airbnb aesthetic</span>
+            <div class="style-dot"></div>
+          </div>
+          <div class="style-card-desc">Gen-Z friendly cozy golden hour vibes</div>
+        </div>
+      </div>
+
+      <hr class="divider" />
+
+      <div>
+        <span class="section-label">2. Built-in pitch differentiators</span>
+        <div class="check-list">
+          <div class="check-item">
+            <span class="check-icon">✓</span>
+            <p><strong>Anti-deception scale limits:</strong> AI can only occupy pre-detected 3D bounding boxes. No unrealistic shrink-to-fit trickery.</p>
+          </div>
+          <div class="check-item">
+            <span class="check-icon">✓</span>
+            <p><strong>Cinematic lighting pipeline:</strong> Auto-projects shadows based on real window exposures detected in raw shots.</p>
+          </div>
+        </div>
+      </div>
+
+      <div id="action-area">
+        <button class="btn-primary" id="main-btn" onclick="startDemo()">
+          ✦ Render high-end spatial scene
+        </button>
+      </div>
+    </div>
+
+    <div class="pitch-note">
+      💡 <span>Pitch strategy:</span> Pull the slider left/right on your iPad in front of investors. Highlight that our watermark loops into Zillow traffic, unlocking a viral 0-cost acquisition engine.
+    </div>
+  </div>
+</main>
+
+<script>
+  const LOGS = [
+    "Analyzing camera focal length & lens distortion...",
+    "Locking 3D architectural skeleton (CA AB 723 compliant)...",
+    "Mapping floor planes & calculating 1:1 real-world scale...",
+    "Injecting high-fidelity furniture assets into bounded boxes...",
+    "Aligning cinematic light rays and shadow drop textures...",
+    "Generating legally compliant metadata & watermarks..."
+  ];
+
+  let currentStep = 'idle';
+  let uploadedImageUrl = null;
+  let selectedStyle = 'Japandi minimal, serene, wabi-sabi';
+  let logInterval = null;
+  let logIdx = 0;
+
+  function showState(id) {
+    document.querySelectorAll('.state').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+  }
+
+  function handleFileUpload(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    uploadedImageUrl = url;
+    document.getElementById('scan-img').src = url;
+    document.getElementById('proc-img').src = url;
+    document.getElementById('before-img').src = url;
+    document.getElementById('status-text').textContent = `File: ${file.name} (${(file.size/1024/1024).toFixed(1)} MB)`;
+    startDemo();
+  }
+
+  function startDemo() {
+    if (currentStep !== 'idle') return;
+    if (!uploadedImageUrl) {
+      document.getElementById('file-input').click();
+      return;
+    }
+    currentStep = 'scanning';
+    showState('scanning');
+    document.getElementById('main-btn').disabled = true;
+    setTimeout(() => {
+      currentStep = 'processing';
+      showState('processing');
+      logIdx = 0;
+      runLogs();
+    }, 2200);
+  }
+
+  function runLogs() {
+    const container = document.getElementById('log-entries');
+    container.innerHTML = '';
+    const fill = document.getElementById('progress-fill');
+    logInterval = setInterval(() => {
+      const line = document.createElement('div');
+      line.className = 'log-line active';
+      line.innerHTML = `<span>[OK]</span><span>${LOGS[logIdx]}</span>`;
+      container.querySelectorAll('.log-line').forEach(l => l.className = 'log-line');
+      container.appendChild(line);
+      fill.style.width = ((logIdx + 1) / LOGS.length * 100) + '%';
+      logIdx++;
+      if (logIdx >= LOGS.length) {
+        clearInterval(logInterval);
+        setTimeout(showCompleted, 600);
+      }
+    }, 800);
+  }
+
+  function showCompleted() {
+    currentStep = 'completed';
+    showState('completed');
+    document.getElementById('reset-btn').classList.add('visible');
+    document.getElementById('action-area').innerHTML = `
+      <div class="btn-row">
+        <button class="btn-sec">⬇ Download MLS package</button>
+        <button class="btn-accent">🛍 Buy furniture package</button>
+      </div>`;
+  }
+
+  function updateSlider(val) {
+    document.getElementById('before-clip').style.width = val + '%';
+    document.getElementById('slider-line').style.left = val + '%';
+  }
+
+  function resetDemo() {
+    currentStep = 'idle';
+    uploadedImageUrl = null;
+    showState('idle');
+    document.getElementById('reset-btn').classList.remove('visible');
+    document.getElementById('slider').value = 50;
+    updateSlider(50);
+    document.getElementById('status-text').textContent = 'Input resolution: 4096 × 2560 (Sony Alpha RAW)';
+    document.getElementById('action-area').innerHTML = `
+      <button class="btn-primary" id="main-btn" onclick="startDemo()">
+        ✦ Render high-end spatial scene
+      </button>`;
+    document.getElementById('file-input').value = '';
+  }
+
+  function selectStyle(el, style) {
+    document.querySelectorAll('.style-card').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+    selectedStyle = style;
+  }
+
+  // Drag and drop
+  const vp = document.getElementById('idle');
+  vp.addEventListener('dragover', e => { e.preventDefault(); });
+  vp.addEventListener('drop', e => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) {
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      document.getElementById('file-input').files = dt.files;
+      handleFileUpload(document.getElementById('file-input'));
+    }
+  });
+</script>
+
+</body>
+</html>
