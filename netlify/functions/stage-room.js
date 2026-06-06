@@ -82,7 +82,9 @@ exports.handler = async (event) => {
     console.log('Output URL:', result.output[0]);
 
     // 4. Fetch AI image and return as base64 to avoid CORS
-    const aiImageRes = await fetch(result.output[0]);
+    const outputUrl = Array.isArray(result.output) ? result.output[0] : result.output;
+    console.log("Final output URL:", outputUrl);
+    const aiImageRes = await fetch(outputUrl);
     const aiImageBuffer = await aiImageRes.arrayBuffer();
     const aiImageBase64 = Buffer.from(aiImageBuffer).toString('base64');
     const mimeType = aiImageRes.headers.get('content-type') || 'image/jpeg';
@@ -103,4 +105,4 @@ exports.handler = async (event) => {
       body: JSON.stringify({ error: err.message })
     };
   }
-}; 
+};
