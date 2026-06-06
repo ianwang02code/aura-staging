@@ -75,7 +75,7 @@ exports.handler = async (event) => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        version: '76604baddc85b1b4616e1a6475eca080da339c8a4d4f7f9510fd5ee6b900e67a',
+       version: '76604baddc85b1b4616e1c6475eca080da339c8875bd4996705440484a6eac38',
         input: {
           image: imageUrl,
           prompt,
